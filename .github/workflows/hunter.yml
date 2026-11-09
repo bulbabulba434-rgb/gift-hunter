@@ -1,0 +1,61 @@
+name: gift-hunter
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # каждые ~10 минут (GitHub иногда запускает с опозданием)
+  workflow_dispatch: {}       # кнопка «Run workflow» для ручного запуска
+
+concurrency:
+  group: gift-hunter
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: write   # чтобы держать расписание включённым (см. последний шаг)
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Restore state
+        uses: actions/cache/restore@v4
+        with:
+          path: state
+          key: hunter-state-${{ github.run_id }}
+          restore-keys: hunter-state-
+
+      - name: Scan market
+        run: python -m hunter run
+        env:
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+          TG_SESSION: ${{ secrets.TG_SESSION }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+      - name: Save state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state
+          key: hunter-state-${{ github.run_id }}
+
+      # GitHub отключает расписание в публичных репо после 60 дней без коммитов.
+      # Повторное «включение» workflow сбрасывает этот счётчик.
+      - name: Keep schedule alive
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/hunter.yml/enable"
