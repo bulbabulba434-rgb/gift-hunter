@@ -115,6 +115,7 @@ def analyze_collection(
                     premium=premium,
                     next_same_model=nxt,
                     listed_in_collection=listed_total or len(priced),
+                    rare_kinds=[a.kind for a in rare],
                 )
             )
     return deals

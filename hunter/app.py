@@ -10,7 +10,7 @@ from telethon.errors import FloodWaitError, RPCError
 from . import ai
 from .bot import Bot
 from .config import Secrets
-from .fmt import format_deal
+from .fmt import deal_buttons, format_deal, format_top
 from .market import Market
 from .models import Deal
 from .scoring import analyze_collection, estimate_ton_rate, is_new
@@ -18,13 +18,21 @@ from .state import State
 
 log = logging.getLogger(__name__)
 
-DISCLAIMER = "Это подсказки алгоритма, а не финансовый совет: проверяй лот сам перед покупкой."
+DISCLAIMER = "⚠️ <i>Это подсказки алгоритма, а не финансовый совет. Проверяй лот сам перед покупкой.</i>"
 HELP = (
-    "Я ищу редкие и недооценённые NFT-подарки на маркете Telegram.\n\n"
-    "/top — лучшие находки последнего скана\n"
-    "/budget 5000 — искать только лоты до 5000 ⭐ (/budget off — без лимита)\n"
-    "/pause, /resume — остановить/включить уведомления\n"
-    "/status — когда был последний скан\n\n" + DISCLAIMER
+    "👋 <b>Я Gift Hunter</b>\n"
+    "Ищу редкие и недооценённые NFT-подарки на маркете Telegram и присылаю их сюда.\n\n"
+    "<b>Что я умею</b>\n"
+    "1. /top — лучшие находки последнего скана\n"
+    "2. /budget 5000 — искать только лоты до 5000 ⭐\n"
+    "3. /budget off — снять лимит цены\n"
+    "4. /pause — выключить уведомления\n"
+    "5. /resume — включить обратно\n"
+    "6. /status — когда был последний скан\n\n"
+    "<b>Как читать находку</b>\n"
+    "🔥 — насколько она сильная (до трёх огоньков)\n"
+    "🔥 у атрибута — он редкий для этой коллекции\n"
+    "🟢 брать · 🟡 присмотреться · 🔴 пропустить — мнение ИИ\n\n" + DISCLAIMER
 )
 
 
@@ -105,7 +113,7 @@ def handle_commands(bot: Bot, cfg: dict, sec: Secrets, st: State, timeout: int =
         if cmd in ("/start", "/help"):
             bot.send(chat, HELP + f"\n\nТвой chat_id: <code>{chat}</code>")
         elif cmd == "/top":
-            bot.send(chat, "\n\n".join(st.last_top) if st.last_top else "Пока нет находок — жду следующий скан.")
+            bot.send(chat, "\n".join(st.last_top) if st.last_top else "Пока нет находок — жду следующий скан.")
         elif cmd == "/budget":
             if not args or args[0].lower() in ("off", "0", "нет"):
                 st.budget = 0
@@ -124,12 +132,16 @@ def handle_commands(bot: Bot, cfg: dict, sec: Secrets, st: State, timeout: int =
         elif cmd == "/status":
             s = st.last_scan
             b = budget_of(cfg, st)
-            bot.send(chat, (
-                f"Последний скан: {s.get('time', 'ещё не было')}\n"
-                f"Коллекций: {s.get('collections', 0)}, лотов: {s.get('listings', 0)}, "
-                f"сделок: {s.get('deals', 0)}, новых: {s.get('new', 0)}\n"
-                f"Лимит: {int(b) if b else 'нет'} ⭐ · {'на паузе' if st.paused else 'работаю'}"
-            ))
+            bot.send(chat, "\n".join([
+                "📡 <b>Статус</b>",
+                "",
+                f"1. Последний скан: {s.get('time', 'ещё не было')}",
+                f"2. Коллекций: {s.get('collections', 0)}",
+                f"3. Лотов просмотрено: {s.get('listings', 0)}",
+                f"4. Находок: {s.get('deals', 0)} (новых: {s.get('new', 0)})",
+                f"5. Лимит цены: {str(int(b)) + ' ⭐' if b else 'нет'}",
+                f"6. Режим: {'⏸ на паузе' if st.paused else '▶️ работаю'}",
+            ]))
 
 
 def run_once(cfg: dict, sec: Secrets) -> None:
@@ -146,9 +158,9 @@ def run_once(cfg: dict, sec: Secrets) -> None:
     if cfg["ai"]["enabled"] and sec.gemini_key:
         ai.explain(fresh[: cfg["ai"]["max_deals"]], sec.gemini_key, cfg["ai"]["model"])
     for d in fresh:
-        bot.send(sec.chat_id, format_deal(d))
+        bot.send(sec.chat_id, format_deal(d), buttons=deal_buttons(d))
         st.mark_seen(d.listing.slug, d.price)
-    st.last_top = [format_deal(d, short=True) for d in deals[:5]]
+    st.last_top = [format_top(deals[:5])]
     st.last_scan = stats
     st.save()
 

@@ -2,7 +2,7 @@
 
   run     один скан + уведомления (так запускает GitHub Actions)
   loop    работать постоянно на своём ПК (бот отвечает сразу)
-  demo    проверить логику на выдуманных данных, без Telegram
+  demo    проверить логику на выдуманных данных, без Telegram (--send — прислать примеры в бота)
   login   получить TG_SESSION для своего аккаунта
   chatid  узнать свой CHAT_ID (сначала напиши боту /start)
 """
@@ -15,7 +15,7 @@ import sys
 from .config import Secrets, load_config
 
 
-def demo(cfg: dict, sec: Secrets) -> None:
+def demo(cfg: dict, sec: Secrets, send: bool = False) -> None:
     from . import ai
     from .fmt import format_deal
     from .models import Attr, Listing
@@ -46,6 +46,19 @@ def demo(cfg: dict, sec: Secrets) -> None:
     print(f"Найдено сделок: {len(deals)} из {len(listings)} лотов\n")
     for d in top:
         print(format_deal(d), "\n")
+
+    if send:
+        from .app import HELP
+        from .bot import Bot
+        from .fmt import deal_buttons, format_top
+
+        bot = Bot(sec.bot_token)
+        bot.send(sec.chat_id, "🧪 <b>Так теперь выглядят сообщения</b> (выдуманные данные)")
+        bot.send(sec.chat_id, HELP)
+        for d in top[:2]:
+            bot.send(sec.chat_id, format_deal(d), buttons=deal_buttons(d))
+        bot.send(sec.chat_id, format_top(top))
+        print("Примеры отправлены в бота.")
 
 
 def login(sec: Secrets) -> None:
@@ -107,7 +120,7 @@ def main() -> None:
     cmd = sys.argv[1] if len(sys.argv) > 1 else "help"
     cfg, sec = load_config(), Secrets.from_env()
     if cmd == "demo":
-        demo(cfg, sec)
+        demo(cfg, sec, send="--send" in sys.argv)
     elif cmd == "login":
         login(sec)
     elif cmd == "chatid":

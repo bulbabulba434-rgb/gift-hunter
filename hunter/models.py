@@ -56,3 +56,4 @@ class Deal:
     listed_in_collection: int
     value: dict | None = None  # Telegram's own price stats for this gift
     ai: dict | None = None  # {"verdict": ..., "comment": ...}
+    rare_kinds: list[str] = field(default_factory=list)  # which attributes counted as rare

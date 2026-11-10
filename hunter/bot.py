@@ -20,10 +20,13 @@ class Bot:
             raise RuntimeError(f"{method}: {data.get('description')}")
         return data["result"]
 
-    def send(self, chat_id: str | int, text: str) -> None:
+    def send(self, chat_id: str | int, text: str, buttons: list[list[dict]] | None = None) -> None:
+        params = {"chat_id": chat_id, "text": text, "parse_mode": "HTML",
+                  "link_preview_options": {"is_disabled": True}}
+        if buttons:
+            params["reply_markup"] = {"inline_keyboard": buttons}
         try:
-            self.call("sendMessage", chat_id=chat_id, text=text, parse_mode="HTML",
-                      link_preview_options={"is_disabled": True})
+            self.call("sendMessage", **params)
         except Exception as e:
             log.error("Не удалось отправить сообщение: %s", e)
 
