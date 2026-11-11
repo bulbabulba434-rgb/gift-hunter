@@ -1,9 +1,12 @@
 name: gift-hunter
 
+# Бот теперь работает 24/7 на FadeHost (python main.py), поэтому здесь только ручной запуск —
+# как запасной вариант. Чтобы вернуть автозапуск, добавь обратно:
+#   schedule:
+#     - cron: "*/10 * * * *"
+# и не запускай одновременно с FadeHost: две копии дублируют уведомления.
 on:
-  schedule:
-    - cron: "*/10 * * * *"   # каждые ~10 минут (GitHub иногда запускает с опозданием)
-  workflow_dispatch: {}       # кнопка «Run workflow» для ручного запуска
+  workflow_dispatch: {}
 
 concurrency:
   group: gift-hunter
@@ -11,7 +14,6 @@ concurrency:
 
 permissions:
   contents: read
-  actions: write   # чтобы держать расписание включённым (см. последний шаг)
 
 jobs:
   scan:
@@ -50,12 +52,3 @@ jobs:
         with:
           path: state
           key: hunter-state-${{ github.run_id }}
-
-      # GitHub отключает расписание в публичных репо после 60 дней без коммитов.
-      # Повторное «включение» workflow сбрасывает этот счётчик.
-      - name: Keep schedule alive
-        if: always()
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/hunter.yml/enable"
