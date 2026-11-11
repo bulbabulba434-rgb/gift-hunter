@@ -28,12 +28,14 @@ def analyze_collection(
     ton_rate: float,
     listed_total: int | None = None,
     budget: float = 0,
+    trend: float | None = None,  # collection floor change over 24h, e.g. -0.2
 ) -> list[Deal]:
     priced = [(p, l) for l in listings if (p := effective_price(l, ton_rate))]
     if len(priced) < 2:
         return []
     priced.sort(key=lambda x: x[0])
     floor, second = priced[0][0], priced[1][0]
+    coll_median = median(p for p, _ in priced)
 
     # An attribute is rare if it is both under the absolute cap and clearly rarer than
     # what is typical for that attribute kind in this collection.
@@ -70,8 +72,9 @@ def analyze_collection(
 
         # Compare with the next pricier lot of the same model that has no extra rare
         # backdrop/symbol this one lacks (those are priced higher for other reasons).
-        nxt, gap = None, 0.0
+        nxt, gap, disc = None, 0.0, 0.0
         model = l.attrs.get("model")
+        model_reason = None
         if model:
             mine = {(a.kind, a.name) for a in rare}
             higher = [
@@ -83,9 +86,26 @@ def analyze_collection(
             if len(higher) >= cfg["min_comparables"]:
                 nxt = min(higher)
                 gap = 1 - p / nxt
-        if gap >= min_gap:
-            score += min(gap, 0.6) * 10
-            reasons.append(f"на {gap:.0%} дешевле следующего лота с моделью «{model.name}»")
+
+            # Price-based value: does the market pay extra for this model, and is this lot
+            # well below what that model usually asks?
+            same = [q for j, (q, o) in enumerate(priced)
+                    if j != i and (om := o.attrs.get("model")) and om.name == model.name]
+            if len(same) >= cfg["min_model_lots"]:
+                model_med = median(same)
+                if model_med / coll_median >= cfg["valued_model_premium"]:
+                    disc = 1 - p / model_med
+                    if disc >= cfg["min_model_discount"]:
+                        model_reason = (f"за модель «{model.name}» обычно просят ~{round(model_med):,} ⭐ "
+                                        f"(в {model_med / coll_median:.1f}× дороже типичного), "
+                                        f"этот лот на {disc:.0%} дешевле").replace(",", " ")
+
+        gap_pts = min(gap, 0.6) * 10 if gap >= min_gap else 0.0
+        disc_pts = min(disc, 0.6) * 8 if model_reason else 0.0
+        if gap_pts or disc_pts:
+            score += max(gap_pts, disc_pts)
+            reasons.append(model_reason if disc_pts > gap_pts
+                           else f"на {gap:.0%} дешевле следующего лота с моделью «{model.name}»")
 
         floor_gap = 1 - p / second if i == 0 else 0.0
         if floor_gap >= min_gap:
@@ -97,12 +117,23 @@ def analyze_collection(
             score += 4 if l.num <= 10 else 3
             reasons.append(f"низкий номер #{l.num}")
 
-        score -= max(0.0, premium - 1) * 1.5
+        # Overpay penalty. A model the market values is naturally above the collection floor,
+        # so for model-price signals measure against that model's cheapest lot instead.
+        ref = floor
+        if (gap_pts or disc_pts) and model:
+            ref = min([p] + [q for q, o in priced if (om := o.attrs.get("model")) and om.name == model.name])
+        score -= max(0.0, p / ref - 1) * 1.5
+
+        warnings: list[str] = []
+        if trend is not None and trend <= -cfg["falling_trend"]:
+            score -= 1.5
+            warnings.append(f"флор коллекции за сутки упал на {-trend:.0%} — цена может продолжить падать")
 
         qualifies = (
             ((rare or low) and premium <= max_prem)
             or gap >= min_gap
             or floor_gap >= min_gap
+            or disc_pts > 0
         )
         if qualifies and score >= cfg["min_score"]:
             deals.append(
@@ -116,6 +147,8 @@ def analyze_collection(
                     next_same_model=nxt,
                     listed_in_collection=listed_total or len(priced),
                     rare_kinds=[a.kind for a in rare],
+                    warnings=warnings,
+                    trend=trend,
                 )
             )
     return deals

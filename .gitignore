@@ -1,4 +1,5 @@
 .env
+*.pub.txt
 state/
 *.session
 __pycache__/

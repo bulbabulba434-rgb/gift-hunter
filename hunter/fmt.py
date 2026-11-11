@@ -51,6 +51,9 @@ def format_deal(d: Deal) -> str:
         f"📉 <b>Флор:</b> {stars(d.floor)} — {vs_floor(d.premium)}",
         f"📦 <b>Лотов в продаже:</b> {d.listed_in_collection}",
     ]
+    if d.trend is not None:
+        icon = "📈" if d.trend >= 0 else "📉"
+        out.append(f"{icon} <b>Флор за сутки:</b> {d.trend:+.0%}")
 
     attrs = []
     for kind in ("model", "backdrop", "symbol"):
@@ -64,6 +67,10 @@ def format_deal(d: Deal) -> str:
     if d.reasons:
         out += ["", "<b>Почему это находка</b>"]
         out += [f"{i}. {escape(r[:1].upper() + r[1:])}" for i, r in enumerate(d.reasons, 1)]
+
+    if d.warnings:
+        out += ["", "<b>⚠️ Риски</b>"]
+        out += [f"{i}. {escape(w[:1].upper() + w[1:])}" for i, w in enumerate(d.warnings, 1)]
 
     if d.value:
         cur = d.value.get("currency", "")
@@ -96,4 +103,13 @@ def format_top(deals: list[Deal]) -> str:
 
 
 def deal_buttons(d: Deal) -> list[list[dict]]:
-    return [[{"text": "🎁 Открыть подарок", "url": d.listing.link}]]
+    slug = d.listing.slug
+    return [
+        [{"text": "🎁 Открыть подарок", "url": d.listing.link}],
+        [{"text": "⭐ Следить за моделью", "callback_data": f"w:{slug}"[:64]},
+         {"text": "🔕 Скрыть коллекцию", "callback_data": f"h:{slug}"[:64]}],
+    ]
+
+
+def open_button(link: str) -> list[list[dict]]:
+    return [[{"text": "🎁 Открыть подарок", "url": link}]]

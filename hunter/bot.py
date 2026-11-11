@@ -31,4 +31,18 @@ class Bot:
             log.error("Не удалось отправить сообщение: %s", e)
 
     def updates(self, offset: int, timeout: int = 0) -> list[dict]:
-        return self.call("getUpdates", offset=offset, timeout=timeout, allowed_updates=["message"])
+        return self.call("getUpdates", offset=offset, timeout=timeout,
+                         allowed_updates=["message", "callback_query"])
+
+    def answer(self, callback_id: str, text: str) -> None:
+        try:
+            self.call("answerCallbackQuery", callback_query_id=callback_id, text=text)
+        except Exception as e:
+            log.warning("answerCallbackQuery: %s", e)
+
+    def set_commands(self, commands: list[tuple[str, str]]) -> None:
+        """Menu of commands shown by the '/' button in Telegram."""
+        try:
+            self.call("setMyCommands", commands=[{"command": c, "description": d} for c, d in commands])
+        except Exception as e:
+            log.warning("setMyCommands: %s", e)

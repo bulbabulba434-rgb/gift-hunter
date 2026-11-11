@@ -57,3 +57,5 @@ class Deal:
     value: dict | None = None  # Telegram's own price stats for this gift
     ai: dict | None = None  # {"verdict": ..., "comment": ...}
     rare_kinds: list[str] = field(default_factory=list)  # which attributes counted as rare
+    warnings: list[str] = field(default_factory=list)  # risks worth showing next to the deal
+    trend: float | None = None  # collection floor change over 24h
