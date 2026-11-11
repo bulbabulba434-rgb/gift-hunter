@@ -1,12 +1,25 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 from dataclasses import asdict, dataclass, field
+from pathlib import Path
 
 from .config import ROOT
 
-STATE_FILE = ROOT / "state" / "state.json"
+
+def _state_dir() -> Path:
+    """STATE_DIR env wins; on hosts with a persistent /data volume (FadeHost) use it; else ./state."""
+    if os.environ.get("STATE_DIR"):
+        return Path(os.environ["STATE_DIR"])
+    data = Path("/data")
+    if data.is_dir() and os.access(data, os.W_OK):
+        return data / "storage"
+    return ROOT / "state"
+
+
+STATE_FILE = _state_dir() / "state.json"
 SEEN_TTL = 7 * 24 * 3600
 
 

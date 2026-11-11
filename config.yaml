@@ -35,7 +35,7 @@ min_score: 4.5              # порог очков; выше = меньше, н
 max_alerts_per_run: 5       # не больше 5 уведомлений за скан
 
 ton_to_stars_fallback: 200  # курс TON→⭐, если его не удалось посчитать из лотов
-loop_interval_sec: 300      # пауза между сканами в режиме `loop`
+loop_interval_sec: 720      # скан раз в 12 минут в режиме `loop`: ~5 МБ за скан ≈ 0.6 ГБ в сутки (лимит FadeHost — 1 ГБ)
 
 ai:
   enabled: true
